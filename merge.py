@@ -156,7 +156,7 @@ for x in x_list:
             author = ref.author
             change_sources = []
             # For each source, if the current placement matches our reference,
-            # advance to the next one.
+            # advance to the next one, because we've now handled this one.
             for s in active_sources:
                 if s.color == color and \
                    s.author[:10] == author[:10] and \

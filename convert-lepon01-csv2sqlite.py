@@ -27,9 +27,10 @@ CREATE TABLE placements (
 )""")
 
     with open(SOURCE_FILENAME, 'r') as source_file:
-        source_csv = csv.DictReader(source_file, fieldnames=('id', 'x', 'y', 'user', 'color', 'timestamp'))
+        # NOTE: x and y appear to be swapped.
+        source_csv = csv.DictReader(source_file, fieldnames=('id', 'y', 'x', 'user', 'color', 'timestamp'))
         for r in source_csv:
-            dest_cur.execute('INSERT INTO placements (id, recieved_on, x, y, color, author) VALUES (?, ?, ?, ?, ?, ?)', (int(r['id']), float(r['timestamp']) / 1000, int(r['y']), int(r['x']), int(r['color']), r['user']))
+            dest_cur.execute('INSERT INTO placements (id, recieved_on, x, y, color, author) VALUES (?, ?, ?, ?, ?, ?)', (int(r['id']), float(r['timestamp']) / 1000, int(r['x']), int(r['y']), int(r['color']), r['user']))
             st['done'] = source_file.tell()
     dest_conn.commit()
 st.finish()
