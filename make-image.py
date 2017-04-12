@@ -25,12 +25,13 @@ STD_COLORS = np.array([
     (130, 0, 128),
 ], np.uint8)
 
-source = SourceLepon()
 for source in [SourceELFAHBET(), SourceF(), SourceLepon(), SourceWgoodall()]:
 #for source in [SourceMerged()]:
     canvas = np.zeros((1001, 1001), np.uint8)
     source.all_by_time()
     source.next()
+    source.all_bitmaps()
+    source.next_bitmap()
 
     st = ttystatus.TerminalStatus(period=0.1)
     st.format('%ElapsedTime() {} %PercentDone(done,total) (%Integer(x),%Integer(y)) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)'.format(source.name))
@@ -40,9 +41,18 @@ for source in [SourceELFAHBET(), SourceF(), SourceLepon(), SourceWgoodall()]:
     while not source.is_done:
         st['x'] = source.x
         st['y'] = source.y
-        canvas[source.y, source.x] = source.color
+        while not source.bitmap_done and source.bitmap_timestamp < source.timestamp:
+            canvas = source.bitmap
+            source.next_bitmap()
+        if source.x < 1000 and source.y < 1000:
+            canvas[source.y, source.x] = source.color
         source.next()
         st['done'] += 1
-
-    Image.fromarray(STD_COLORS[canvas]).save('Source{}.png'.format(source.name))
     st.finish()
+
+    if not source.bitmap_done:
+        print 'Final {} image from stored bitmap.'.format(source.name)
+        while not source.bitmap_done:
+            canvas = source.bitmap
+            source.next_bitmap()
+    Image.fromarray(STD_COLORS[canvas]).save('Source{}.png'.format(source.name))

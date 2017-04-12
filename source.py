@@ -1,11 +1,19 @@
 #!/usr/bin/env python
 
 import sqlite3
+import struct
 
+import numpy as np
+
+def split_colors(byte):
+    v = struct.unpack('B', byte)[0]
+    return (v>>4, v&0x0f)
+    
 class Source(object):
     def __init__(self):
         self.connection = sqlite3.connect(self.source_file)
         self.cursor = self.connection.cursor()
+        self.bitmap_cursor = self.connection.cursor()
 
     def set_pixel(self, x, y):
         self.cursor.execute(self.query_pixel_count, (x, y))
@@ -25,6 +33,14 @@ class Source(object):
     def next(self):
         self.record = self.cursor.fetchone()
 
+    def all_bitmaps(self):
+        self.bitmap_cursor.execute(self.query_bitmap_count)
+        self.bitmap_count = self.cursor.fetchone()[0]
+        self.bitmap_cursor.execute(self.query_bitmaps)
+
+    def next_bitmap(self):
+        self.bitmap_record = self.bitmap_cursor.fetchone()
+        
     @property
     def is_done(self):
         return self.record is None
@@ -56,6 +72,23 @@ class Source(object):
     @property
     def author(self):
         return str(self.record[5])
+
+    @property
+    def bitmap_done(self):
+        return self.bitmap_record is None
+    
+    @property
+    def bitmap_timestamp(self):
+        return self.bitmap_record[0]
+
+    @property
+    def bitmap(self):
+        """NumPy (1000, 1000) array of color numbers."""
+        arr = np.fromstring(self.bitmap_record[1][4:-1], np.uint8)
+        arr = arr.repeat(2)
+        arr[::2] >>= 4
+        arr[1::2] &= 0x0f
+        return arr[:1000000].reshape((1000, 1000))
 
 class SourceELFAHBET(Source):
     @property
@@ -90,6 +123,14 @@ class SourceELFAHBET(Source):
     def query_all_count(self):
         return '''SELECT COUNT(*) FROM placements'''
 
+    @property
+    def query_bitmaps(self):
+        return '''SELECT recieved_on, data FROM starting_bitmaps ORDER BY recieved_on'''
+    
+    @property
+    def query_bitmap_count(self):
+        return '''SELECT COUNT(*) FROM starting_bitmaps'''
+    
 class SourceF(Source):
     @property
     def name(self):
@@ -119,6 +160,14 @@ class SourceF(Source):
     def query_all_count(self):
         return '''SELECT COUNT(*) FROM placements'''
 
+    @property
+    def query_bitmaps(self):
+        return '''SELECT recieved_on, data FROM starting_bitmaps ORDER BY recieved_on'''
+    
+    @property
+    def query_bitmap_count(self):
+        return '''SELECT COUNT(*) FROM starting_bitmaps'''
+    
 class SourceLepon(Source):
     @property
     def name(self):
@@ -148,6 +197,14 @@ class SourceLepon(Source):
     def query_all_count(self):
         return '''SELECT COUNT(*) FROM placements'''
 
+    @property
+    def query_bitmaps(self):
+        return '''SELECT NULL LIMIT 0'''
+    
+    @property
+    def query_bitmap_count(self):
+        return '''SELECT 0'''
+    
 class SourceWgoodall(Source):
     @property
     def name(self):
@@ -177,6 +234,14 @@ class SourceWgoodall(Source):
     def query_all_count(self):
         return '''SELECT COUNT(*) FROM place WHERE timestamp IS NOT NULL'''
 
+    @property
+    def query_bitmaps(self):
+        return '''SELECT CAST(strftime('%s', timestamp) AS INT), bitmap FROM bitmap WHERE LENGTH(bitmap) >= 500000 ORDER BY timestamp'''
+    
+    @property
+    def query_bitmap_count(self):
+        return '''SELECT COUNT(*) FROM bitmap WHERE LENGTH(bitmap) >= 500000'''
+    
     
 class SourceMerged(Source):
     @property

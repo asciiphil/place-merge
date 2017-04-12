@@ -54,9 +54,12 @@ for s in sources:
     else:
         s.all_by_pixel()
     s.next()
+    s.all_bitmaps()
+    s.next_bitmap()
 
 active_sources = [s for s in sources if not s.is_done]
-while len(active_sources) > 0:
+bitmap_sources = [s for s in sources is not s.bitmap_done]
+while len(active_sources) > 0 or len(bitmap_sources) > 0:
     pixel_sources = [s for s in active_sources if s.x == x and s.y == y]
     while len(pixel_sources) > 0:
         ref = sorted(pixel_sources, key=lambda s: s.timestamp)[0]
