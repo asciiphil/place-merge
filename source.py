@@ -35,7 +35,11 @@ class Source(object):
 
     def all_bitmaps(self):
         self.bitmap_cursor.execute(self.query_bitmap_count)
-        self.bitmap_count = self.cursor.fetchone()[0]
+        row = self.cursor.fetchone()
+        if row is None:
+            self.bitmap_count = 0
+        else:
+            self.bitmap_count = row[0]
         self.bitmap_cursor.execute(self.query_bitmaps)
 
     def next_bitmap(self):
@@ -84,11 +88,19 @@ class Source(object):
     @property
     def bitmap(self):
         """NumPy (1000, 1000) array of color numbers."""
-        arr = np.fromstring(self.bitmap_record[1][4:-1], np.uint8)
+        arr = np.fromstring(self.bitmap_record[1][4:500004], np.uint8)
         arr = arr.repeat(2)
         arr[::2] >>= 4
         arr[1::2] &= 0x0f
         return arr[:1000000].reshape((1000, 1000))
+
+    def bitmap_pixel(self, x, y):
+        char = self.bitmap_record[1][(y * 1000 + x) / 2 + 4]
+        value = struct.unpack('B', char)[0]
+        if x % 2 == 0:
+            return value >> 4
+        else:
+            return value & 0x0f
 
 class SourceELFAHBET(Source):
     @property
