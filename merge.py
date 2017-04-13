@@ -15,15 +15,26 @@ DUPLICATE_WINDOW = 300
 
 if len(sys.argv) > 1:
     debug = True
-    x = int(sys.argv[1])
-    y = int(sys.argv[2])
+    param_x = int(sys.argv[1])
+    param_y = int(sys.argv[2])
 else:
     debug = False
-    x = 0
-    y = 0
-    
-sources = [SourceF(), SourceELFAHBET(), SourceLepon(), SourceWgoodall()]
-if not debug:
+
+def write_pixel(timestamp, x, y, color, author, source, dest_cur, debug):
+    if debug:
+        print '{}  {:3} {:3} {:3}  {:16} {}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(timestamp)), x, y, color, '' if author is None else author, source)
+    else:
+        dest_cur.execute('INSERT INTO placements VALUES (?, ?, ?, ?, ?)', (timestamp, x, y, color, author))
+
+def write_duplicate(timestamp, x, y, color, author, source, dest_cur, debug):
+    if debug:
+        print '                                                 + {}'.format(source)
+        
+source_conn = sqlite3.connect('unpacked.sqlite')
+source_cur = source_conn.cursor()
+if debug:
+    dest_cur = None
+else:
     dest_conn = sqlite3.connect('merged.sqlite')
     dest_cur = dest_conn.cursor()
     dest_cur.execute('DROP TABLE IF EXISTS placements')
@@ -33,7 +44,7 @@ CREATE TABLE placements (
   x INTEGER,
   y INTEGER,
   color INTEGER,
-  author INTEGER
+  author TEXT
 )""")
     dest_cur.execute('CREATE INDEX placements_timestamp_idx ON placements(timestamp)')
     dest_cur.execute('CREATE INDEX placements_color_idx ON placements(color)')
@@ -42,96 +53,49 @@ CREATE TABLE placements (
 
     st = ttystatus.TerminalStatus(period=0.1)
     st.format('%ElapsedTime() %PercentDone(done,total) (%Integer(x),%Integer(y)) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)')
-    st['x'] = x
-    st['y'] = y
     st['done'] = 0
-    st['total'] = 1001 * 1001
+    source_cur.execute('SELECT COUNT(*) FROM unpacked')
+    st['total'] = source_cur.fetchone()[0]
     st.flush()
 
-for s in sources:
-    if debug:
-        s.set_pixel(x, y)
-    else:
-        s.all_by_pixel()
-    s.all_bitmaps()
+if debug:
+    source_cur.execute('SELECT timestamp, x, y, color, author, source FROM unpacked WHERE x = ? AND y = ? ORDER BY timestamp', (param_x, param_y))
+else:
+    source_cur.execute('SELECT timestamp, x, y, color, author, source FROM unpacked ORDER BY x, y, timestamp')
 
-last_color = None
-active_sources = [s for s in sources if not s.is_done]
-bitmap_sources = [s for s in sources if not s.bitmap_done]
-while len(active_sources) > 0:
-    pixel_sources = [s for s in active_sources if s.x == x and s.y == y]
-    while len(pixel_sources) > 0:
-        ref = sorted(pixel_sources, key=lambda s: s.timestamp)[0]
-        ref_bitmap = sorted(bitmap_sources, key=lambda s: s.bitmap_timestamp)[0]
-        ref_bitmap_color = ref_bitmap.bitmap_pixel(x, y)
-        # Fast forward through old, static cached bitmaps
-        while ref_bitmap.bitmap_timestamp < ref.timestamp and ref_bitmap_color == last_color:
-            ref_bitmap.next_bitmap()
-            if ref_bitmap.bitmap_done:
-                bitmap_sources = [s for s in sources if not s.bitmap_done]
-            ref_bitmap = sorted(bitmap_sources, key=lambda s: s.bitmap_timestamp)[0]
-            ref_bitmap_color = ref_bitmap.bitmap_pixel(x, y)
-        if ref_bitmap.bitmap_timestamp < ref.timestamp and ref_bitmap_color != last_color:
-            # One of the full-state bitmaps has a new color for us.
-            timestamp = ref_bitmap.bitmap_timestamp
-            color = ref_bitmap_color
-            author = None
-            change_sources = [ref_bitmap.name]
-            ref_bitmap.next_bitmap()
-            if ref_bitmap.bitmap_done:
-                bitmap_sources = [s for s in sources if not s.bitmap_done]
-        else:
-            timestamp = ref.timestamp
-            color = ref.color
-            author = ref.author
-            change_sources = []
-            # For each source, if the current placement matches our reference,
-            # advance to the next one, because we've now handled this one.
-            for s in pixel_sources:
-                if s.color == color and \
-                   s.author[:10] == author[:10] and \
-                   s.timestamp - timestamp <= DUPLICATE_WINDOW:
-                    change_sources.append(s.name)
-                    if len(s.author) > author:
-                        author = s.author
-                    s.next()
-        if debug:
-            print '{}  {:3} {:3} {:3}  {:16} {}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(timestamp)), x, y, color, '' if author is None else author, change_sources)
-        else:
-            dest_cur.execute('INSERT INTO placements VALUES (?, ?, ?, ?, ?)', (timestamp, x, y, color, author))
-        last_color = color
-        pixel_sources = [s for s in pixel_sources if not s.is_done and s.x == x and s.y == y]
-    # No more pixel placements.  Make sure we've emptied the cached bitmaps.
-    while len(bitmap_sources) > 0:
-        ref_bitmap = sorted(bitmap_sources, key=lambda s: s.bitmap_timestamp)[0]
-        ref_bitmap_color = ref_bitmap.bitmap_pixel(x, y)
-        if ref_bitmap_color != last_color:
-            timestamp = ref_bitmap.bitmap_timestamp
-            color = ref_bitmap_color
-            author = None
-            change_sources = [ref_bitmap.name]
-            if debug:
-                print '{}  {:3} {:3} {:3}  {:16} {}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(timestamp)), x, y, color, '' if author is None else author, change_sources)
-            else:
-                dest_cur.execute('INSERT INTO placements VALUES (?, ?, ?, ?, ?)', (timestamp, x, y, color, author))
-            last_color = color
-        ref_bitmap.next_bitmap()
-        if ref_bitmap.bitmap_done:
-            bitmap_sources = [s for s in sources if not s.bitmap_done]
-    y += 1
-    if y > 1000:
-        x += 1
-        y = 0
-    last_color = None
-    active_sources = [s for s in active_sources if not s.is_done]
-    for s in sources:
-        s.all_bitmaps()
-    bitmap_sources = [s for s in sources if not s.bitmap_done]
+last_x = None
+last_y = None
+for timestamp, x, y, color, author, source in source_cur:
     if not debug:
         st['x'] = x
         st['y'] = y
+    if x != last_x or y != last_y:
+        last_color = None
+        last_source = None
+        last_timestamp = 0
+    # If there's no author, this is a synthetic event; only write it if it
+    # changes the color of the pixel.
+    # If there is an author, check for duplication.  It's a duplicate if it has
+    # a different source than the last placement and is within the
+    # DUPLICATE_WINDOW.
+    if (author is None and color != last_color) or \
+       (author is not None and (source == last_source or timestamp - last_timestamp >= DUPLICATE_WINDOW)):
+        write_pixel(timestamp, x, y, color, author, source, dest_cur, debug)
+        # Only update last_timestamp if this was a real placement, and then only
+        # if it was written to the database.  This ensures that we only compare
+        # to the earliest known time of the placement.
+        if author is not None:
+            last_timestamp = timestamp
+    elif author is not None:
+        # This is a real placement, so it must have been a duplicate
+        write_duplicate(timestamp, x, y, color, author, source, dest_cur, debug)
+    last_x = x
+    last_y = y
+    last_color = color
+    last_source = source
+    if not debug:
         st['done'] += 1
-        st.flush()
+    
 if not debug:
     dest_conn.commit()
     st.finish()
