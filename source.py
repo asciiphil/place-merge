@@ -83,7 +83,7 @@ class Source(object):
     
     @property
     def bitmap_timestamp(self):
-        return self.bitmap_record[0]
+        return struct.unpack('I', self.bitmap_record[1][:4])[0]
 
     @property
     def bitmap(self):
