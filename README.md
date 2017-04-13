@@ -12,9 +12,12 @@ Usage
 
 First, install the NumPy and ttystatus Python modules.
 
-Next, download the datasets from the Google document.  These scripts
-currently know how to deal with data from ELFAHBET_SOOP, F, lepon01, and
+Next, download the datasets from the Google document, plus
+[teaearlgraycold's dataset][teaearlgray].  These scripts currently know
+how to deal with data from ELFAHBET_SOOP, F, lepon01, teaearlgraycold, and
 wgoodall01.
+
+  [teaearlgray]: https://www.reddit.com/r/PlaceDevs/comments/634nzu/_/dfyq6m8/?context=3
 
 For wgoodall01's, F's, and ELFAHBET_SOOP's SQLite databases, name them:
 
