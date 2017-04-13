@@ -19,28 +19,28 @@ class Source(object):
         self.cursor.execute(self.query_pixel_count, (x, y))
         self.count = self.cursor.fetchone()[0]
         self.cursor.execute(self.query_pixel, (x, y))
+        self.next()
 
     def all_by_time(self):
         self.cursor.execute(self.query_all_count)
         self.count = self.cursor.fetchone()[0]
         self.cursor.execute(self.query_all_by_time)
+        self.next()
         
     def all_by_pixel(self):
         self.cursor.execute(self.query_all_count)
         self.count = self.cursor.fetchone()[0]
         self.cursor.execute(self.query_all_by_pixel)
+        self.next()
         
     def next(self):
         self.record = self.cursor.fetchone()
 
     def all_bitmaps(self):
         self.bitmap_cursor.execute(self.query_bitmap_count)
-        row = self.cursor.fetchone()
-        if row is None:
-            self.bitmap_count = 0
-        else:
-            self.bitmap_count = row[0]
+        self.bitmap_count = self.bitmap_cursor.fetchone()[0]
         self.bitmap_cursor.execute(self.query_bitmaps)
+        self.next_bitmap()
 
     def next_bitmap(self):
         self.bitmap_record = self.bitmap_cursor.fetchone()

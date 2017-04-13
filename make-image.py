@@ -29,9 +29,7 @@ for source in [SourceELFAHBET(), SourceF(), SourceLepon(), SourceWgoodall()]:
 #for source in [SourceMerged()]:
     canvas = np.zeros((1001, 1001), np.uint8)
     source.all_by_time()
-    source.next()
     source.all_bitmaps()
-    source.next_bitmap()
 
     st = ttystatus.TerminalStatus(period=0.1)
     st.format('%ElapsedTime() {} %PercentDone(done,total) (%Integer(x),%Integer(y)) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)'.format(source.name))

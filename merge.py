@@ -53,9 +53,7 @@ for s in sources:
         s.set_pixel(x, y)
     else:
         s.all_by_pixel()
-    s.next()
     s.all_bitmaps()
-    s.next_bitmap()
 
 last_color = None
 active_sources = [s for s in sources if not s.is_done]
@@ -128,7 +126,6 @@ while len(active_sources) > 0:
     active_sources = [s for s in active_sources if not s.is_done]
     for s in sources:
         s.all_bitmaps()
-        s.next_bitmap()
     bitmap_sources = [s for s in sources if not s.bitmap_done]
     if not debug:
         st['x'] = x
