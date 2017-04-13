@@ -25,7 +25,7 @@ STD_COLORS = np.array([
     (130, 0, 128),
 ], np.uint8)
 
-for source in [SourceELFAHBET(), SourceF(), SourceLepon(), SourceWgoodall()]:
+for source in [SourceELFAHBET(), SourceF(), SourceLepon(), SourceTea(), SourceWgoodall()]:
 #for source in [SourceMerged()]:
     canvas = np.zeros((1001, 1001), np.uint8)
     source.all_by_time()
