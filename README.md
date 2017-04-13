@@ -19,10 +19,12 @@ wgoodall01.
 
   [teaearlgray]: https://www.reddit.com/r/PlaceDevs/comments/634nzu/_/dfyq6m8/?context=3
 
-For wgoodall01's, F's, and ELFAHBET_SOOP's SQLite databases, name them:
+For wgoodall01's, F's, teaearlgraycold's and ELFAHBET_SOOP's SQLite
+databases, name them:
 
  * `source-ELFAHBET_SOOP.sqlite`
- * `source-F.sqlite` and
+ * `source-F.sqlite`
+ * `source-teaearlgraycold.sqlite` and
  * `source-wgoodall01.sqlite`
 
 Name lepon01's file:
