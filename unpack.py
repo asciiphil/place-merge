@@ -15,9 +15,10 @@ def canvas_update_pixel(canvas, source):
         canvas[source.y, source.x] = source.color
     
 def add_bitmap(canvas, source, dest_cur):
+    timestamp = source.bitmap_timestamp
     bitmap = source.bitmap
     for x, y in np.array(np.where(canvas != bitmap)).T:
-        dest_cur.execute('INSERT INTO unpacked (timestamp, x, y, color, source) VALUES (?, ?, ?, ?, ?)', (source.timestamp, x, y, int(bitmap[y, x]), source.name))
+        dest_cur.execute('INSERT INTO unpacked (timestamp, x, y, color, source) VALUES (?, ?, ?, ?, ?)', (timestamp, x, y, int(bitmap[y, x]), source.name))
 
 def canvas_update_bitmap(canvas, source):
     np.copyto(canvas, source.bitmap)
@@ -37,7 +38,7 @@ CREATE TABLE unpacked (
 dest_cur.execute('CREATE INDEX pum_timestamp_idx ON unpacked(timestamp)')
 dest_cur.execute('CREATE INDEX pum_position_idx ON unpacked(x, y)')
 
-sources = [SourceELFAHBET(), SourceF(), SourceLepon(), SourceWgoodall()]
+sources = [SourceELFAHBET(), SourceF(), SourceLepon(), SourceTea(), SourceWgoodall()]
 for source in sources:
     source.all_by_time()
     source.all_bitmaps()
