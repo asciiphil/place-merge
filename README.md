@@ -3,6 +3,9 @@ Summary
 
 Merges the change history for the canvas, pixel by pixel.
 
+The entire merge process will use about 8GB of disk space.  The result is
+a roughly 1.6GB SQLite database with roughly 16 million pixel placements.
+
 
 Usage
 =====
@@ -40,8 +43,8 @@ to show the merged series of changes for that pixel.  e.g.:
 
     $ ./merge.py 67 32
     2017-04-01 08:23:32   67  32  15  calltheherd      ELFAHBET_SOOP
-                                                     + F
-                                                     + lepon01
+               08:23:32                              + F
+               08:23:32                              + lepon01
     2017-04-02 05:39:36   67  32   3  DeepFriedBabeez  F
     2017-04-02 06:32:23   67  32   3  DeepFriedBabeez  ELFAHBET_SOOP
 

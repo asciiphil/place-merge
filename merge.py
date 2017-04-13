@@ -28,7 +28,7 @@ def write_pixel(timestamp, x, y, color, author, source, dest_cur, debug):
 
 def write_duplicate(timestamp, x, y, color, author, source, dest_cur, debug):
     if debug:
-        print '                                                 + {}'.format(source)
+        print '           {}                              + {}'.format(time.strftime('%H:%M:%S', time.gmtime(timestamp)), source)
         
 source_conn = sqlite3.connect('unpacked.sqlite')
 source_cur = source_conn.cursor()
