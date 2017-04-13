@@ -49,3 +49,11 @@ This is useful for debugging and sanity-checking.
 
 If you run `merge.py` without any parameters, it will write a new database
 with the merged data.  This takes about 40 minutes on the author's system.
+
+
+Utilities
+=========
+
+The `make-image.py` script runs the source datasets through all of their
+changes to make a final image.  It needs the Python Imaging Library
+installed.
