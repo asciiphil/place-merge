@@ -102,15 +102,7 @@ class Source(object):
         else:
             return value & 0x0f
 
-class SourceELFAHBET(Source):
-    @property
-    def name(self):
-        return 'ELFAHBET_SOOP'
-
-    @property
-    def source_file(self):
-        return 'source-ELFAHBET_SOOP.sqlite'
-
+class SourcePlaceScraper(Source):
     @property
     def query_pixel(self):
         return '''SELECT NULL, recieved_on, y, x, color, author FROM placements WHERE y = ? AND x = ? ORDER BY recieved_on'''
@@ -142,8 +134,17 @@ class SourceELFAHBET(Source):
     @property
     def query_bitmap_count(self):
         return '''SELECT COUNT(*) FROM starting_bitmaps'''
-    
-class SourceF(Source):
+        
+class SourceELFAHBET(SourcePlaceScraper):
+    @property
+    def name(self):
+        return 'ELFAHBET_SOOP'
+
+    @property
+    def source_file(self):
+        return 'source-ELFAHBET_SOOP.sqlite'
+
+class SourceF(SourcePlaceScraper):
     @property
     def name(self):
         return 'F'
@@ -152,34 +153,6 @@ class SourceF(Source):
     def source_file(self):
         return 'source-F.sqlite'
 
-    @property
-    def query_pixel(self):
-        return '''SELECT NULL, recieved_on, y, x, color, author FROM placements WHERE y = ? AND x = ? ORDER BY recieved_on'''
-
-    @property
-    def query_pixel_count(self):
-        return '''SELECT COUNT(*) FROM placements WHERE y = ? AND x = ?'''
-
-    @property
-    def query_all_by_time(self):
-        return '''SELECT NULL, recieved_on, y, x, color, author FROM placements ORDER BY recieved_on, y, x'''
-
-    @property
-    def query_all_by_pixel(self):
-        return '''SELECT NULL, recieved_on, y, x, color, author FROM placements ORDER BY y, x, recieved_on'''
-
-    @property
-    def query_all_count(self):
-        return '''SELECT COUNT(*) FROM placements'''
-
-    @property
-    def query_bitmaps(self):
-        return '''SELECT recieved_on, data FROM starting_bitmaps ORDER BY recieved_on'''
-    
-    @property
-    def query_bitmap_count(self):
-        return '''SELECT COUNT(*) FROM starting_bitmaps'''
-    
 class SourceLepon(Source):
     @property
     def name(self):
@@ -216,7 +189,16 @@ class SourceLepon(Source):
     @property
     def query_bitmap_count(self):
         return '''SELECT 0'''
-    
+
+class SourceTea(SourcePlaceScraper):
+    @property
+    def name(self):
+        return 'teaearlgreycold'
+
+    @property
+    def source_file(self):
+        return 'source-teaearlgreycold.sqlite'
+
 class SourceWgoodall(Source):
     @property
     def name(self):
