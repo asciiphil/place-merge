@@ -70,8 +70,9 @@ for timestamp, x, y, color, author, source in source_cur:
         st['x'] = x
         st['y'] = y
     if x != last_x or y != last_y:
-        last_color = None
+        last_color = 0
         last_source = None
+        last_author = None
         last_timestamp = 0
     # If there's no author, this is a synthetic event; only write it if it
     # changes the color of the pixel.
@@ -79,7 +80,7 @@ for timestamp, x, y, color, author, source in source_cur:
     # a different source than the last placement and is within the
     # DUPLICATE_WINDOW.
     if (author is None and color != last_color) or \
-       (author is not None and (source == last_source or timestamp - last_timestamp >= DUPLICATE_WINDOW)):
+       (author is not None and (author != last_author or source == last_source or timestamp - last_timestamp >= DUPLICATE_WINDOW)):
         write_pixel(timestamp, x, y, color, author, source, dest_cur, debug)
         # Only update last_timestamp if this was a real placement, and then only
         # if it was written to the database.  This ensures that we only compare
@@ -93,6 +94,7 @@ for timestamp, x, y, color, author, source in source_cur:
     last_y = y
     last_color = color
     last_source = source
+    last_author = author
     if not debug:
         st['done'] += 1
     
