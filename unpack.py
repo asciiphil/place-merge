@@ -37,7 +37,8 @@ CREATE TABLE unpacked (
 dest_cur.execute('CREATE INDEX pum_timestamp_idx ON unpacked(timestamp)')
 dest_cur.execute('CREATE INDEX pum_position_idx ON unpacked(x, y)')
 
-for source in [SourceELFAHBET(), SourceF(), SourceLepon(), SourceWgoodall()]:
+sources = [SourceELFAHBET(), SourceF(), SourceLepon(), SourceWgoodall()]
+for source in sources:
     source.all_by_time()
     source.all_bitmaps()
     
