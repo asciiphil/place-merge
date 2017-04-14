@@ -41,7 +41,7 @@ Run `unpack.py` .  This combines data from all of the source datasets into
 a single, non-consolidated SQLite database.  It also takes the cached
 bitmaps from the board-place API endpoint and creates synthetic pixel
 placements from them, so the merge process will have uniform data to work
-with.  This takes about half an hour on the author's system.
+with.  This takes about an hour on the author's system.
 
 At this point, you can run `merge.py` with x and y command line parameters
 to show the merged series of changes for that pixel.  e.g.:
@@ -56,7 +56,7 @@ to show the merged series of changes for that pixel.  e.g.:
 This is useful for debugging and sanity-checking.
 
 If you run `merge.py` without any parameters, it will write a new database
-with the merged data.  This takes about 40 minutes on the author's system.
+with the merged data.  This takes an hour or so on the author's system.
 
 
 Utilities
