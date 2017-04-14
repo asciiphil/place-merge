@@ -8,7 +8,7 @@ import ttystatus
 import numpy as np
 
 def add_bitmap(canvas, bitmap, timestamp, source, dest_cur):
-    for x, y in np.array(np.where(canvas != bitmap)).T:
+    for y, x in np.array(np.where(canvas != bitmap)).T:
         dest_cur.execute('INSERT INTO placements (timestamp, x, y, color, source) VALUES (?, ?, ?, ?, ?)', (timestamp, x, y, int(bitmap[y, x]), source))
 
 def canvas_update_bitmap(canvas, bitmap):

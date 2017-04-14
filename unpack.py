@@ -17,7 +17,7 @@ def canvas_update_pixel(canvas, source):
 def add_bitmap(canvas, source, dest_cur):
     timestamp = source.bitmap_timestamp
     bitmap = source.bitmap
-    for x, y in np.array(np.where(canvas != bitmap)).T:
+    for y, x in np.array(np.where(canvas != bitmap)).T:
         dest_cur.execute('INSERT INTO unpacked (timestamp, x, y, color, source) VALUES (?, ?, ?, ?, ?)', (timestamp, x, y, int(bitmap[y, x]), source.name))
 
 def canvas_update_bitmap(canvas, source):
