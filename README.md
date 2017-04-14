@@ -65,3 +65,10 @@ Utilities
 The `make-image.py` script runs the source datasets through all of their
 changes to make a final image.  It needs the Python Imaging Library
 installed.
+
+The `make-video.py` script does more or less the same thing, but creates a
+timelapse video of each dataset.  It needs [ffmpeg][] to be installed and
+in the `$PATH`.
+
+  [ffmpeg]: https://ffmpeg.org
+  
