@@ -95,8 +95,7 @@ class ImportPlaceScraper(Import):
 
     def iter_placements(self):
         for row in self.source_db.execute('SELECT * FROM placements'):
-            # NOTE: x and y are swapped in the source database!
-            yield (row['recieved_on'], row['y'], row['x'], row['color'], row['author'])
+            yield (row['recieved_on'], row['x'], row['y'], row['color'], row['author'])
 
     def get_placement_status(self, old_count):
         return old_count + 1
@@ -108,10 +107,44 @@ class ImportPlaceScraper(Import):
     def get_board_status(self, old_count):
         return old_count + 1
 
+class ImportPlaceScraperSwapped(ImportPlaceScraper):
+    def iter_placements(self):
+        for row in self.source_db.execute('SELECT * FROM placements'):
+            # NOTE: x and y are swapped in the source database!
+            yield (row['recieved_on'], row['y'], row['x'], row['color'], row['author'])
+
+class ImportWgoodall01(Import):
+    def __init__(self, input_file, db_conn, source_name):
+        super(ImportWgoodall01, self).__init__(input_file, db_conn, source_name)
+        self.source_db = sqlite3.connect(self.input_file.name)
+        self.source_db.row_factory = sqlite3.Row
+
+    @property
+    def total_items(self):
+        placement_cursor = self.source_db.execute('SELECT COUNT(*) FROM place WHERE timestamp IS NOT NULL')
+        bitmap_cursor = self.source_db.execute('SELECT COUNT(*) FROM bitmap WHERE LENGTH(bitmap) >= 500000')
+        return placement_cursor.fetchone()[0] + bitmap_cursor.fetchone()[0]
+
+    def iter_placements(self):
+        for row in self.source_db.execute('SELECT CAST(strftime(\'%s\', timestamp) AS INT) AS timestamp, x, y, color, author FROM place WHERE timestamp IS NOT NULL'):
+            yield (row['timestamp'], row['x'], row['y'], row['color'], row['author'])
+
+    def get_placement_status(self, old_count):
+        return old_count + 1
+        
+    def iter_boards(self):
+        for row in self.source_db.execute('SELECT bitmap FROM bitmap WHERE LENGTH(bitmap) >= 500000'):
+            yield row['bitmap']
+
+    def get_board_status(self, old_count):
+        return old_count + 1
+
     
 SCHEMAS = {
     'moustacheminer': ImportMoustacheMiner,
     'place-scraper': ImportPlaceScraper,
+    'place-scraper-swapped': ImportPlaceScraperSwapped,
+    'wgoodall01': ImportWgoodall01,
 }
 
 class ListSchemaAction(argparse.Action):
