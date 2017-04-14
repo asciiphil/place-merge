@@ -53,7 +53,10 @@ for source in [SourceELFAHBET(), SourceF(), SourceLepon(), SourceTea(), SourceWg
     canvas = np.zeros((1000, 1000), np.uint8)
     source.all_by_time()
     source.all_bitmaps()
-    next_frame_ts = min(source.timestamp, source.bitmap_timestamp) - SPF
+    if source.bitmap_count > 0:
+        next_frame_ts = min(source.timestamp, source.bitmap_timestamp) - SPF
+    else:
+        next_frame_ts = source.timestamp - SPF
 
     st = ttystatus.TerminalStatus(period=0.1)
     st.format('%ElapsedTime() {} %PercentDone(done,total) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)'.format(source.name))
