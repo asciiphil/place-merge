@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
 import argparse
+import csv
+import os.path
 import sqlite3
 import struct
 
 import ttystatus
 import numpy as np
+
 
 def board_timestamp(board):
     return struct.unpack('I', board[:4])[0]
@@ -16,20 +19,15 @@ def board_bitmap(board):
     arr[::2] >>= 4
     arr[1::2] &= 0x0f
     return arr.reshape((1000, 1000))
-    
-class ImportPlaceScraper:
+
+
+class Import(object):
     def __init__(self, input_file, db_conn, source_name):
         self.input_file = input_file
         self.dest_db = db_conn
-        self.source_db = sqlite3.connect(input_file.name)
-        self.source_db.row_factory = sqlite3.Row
         self.source_name = source_name
 
     def run(self):
-        # Set up cursors
-        placement_cursor = self.source_db.cursor()
-        bitmap_cursor = self.source_db.cursor()
-
         # Set up progress bar
         st = ttystatus.TerminalStatus(period=0.1)
         st.format('%ElapsedTime() %String(stage) %PercentDone(done,total) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)')
@@ -38,38 +36,81 @@ class ImportPlaceScraper:
         st.flush()
 
         # Figure out how much work there is to do.
-        placement_cursor.execute('SELECT COUNT(*) FROM placements')
-        bitmap_cursor.execute('SELECT COUNT(*) FROM starting_bitmaps')
-        st['total'] = placement_cursor.fetchone()[0] + bitmap_cursor.fetchone()[0]
+        st['total'] = self.total_items
 
-        st['stage'] = 'making room'
-        st.flush()
-        self.dest_db.execute('DELETE FROM raw_placements WHERE source = ?', (self.source_name,))
-        self.dest_db.execute('DELETE FROM raw_boards WHERE source = ?', (self.source_name,))
-        
         # Transfer placements
         st['stage'] = 'placements'
         st.flush()
-        for row in self.source_db.execute('SELECT * FROM placements'):
-            # NOTE: x and y are swapped in the source database!
+        for timestamp, x, y, color, author in self.iter_placements():
             self.dest_db.execute('INSERT INTO raw_placements (timestamp, x, y, color, author, source) VALUES (?, ?, ?, ?, ?, ?)',
-                                 (row['recieved_on'], row['y'], row['x'], row['color'], row['author'], self.source_name))
-            st['done'] += 1
+                                 (timestamp, x, y, color, author, self.source_name))
+            st['done'] = self.get_placement_status(st['done'])
 
         # Transfer bitmaps
         st['stage'] = 'boards'
         st.flush()
-        for row in self.source_db.execute('SELECT * FROM starting_bitmaps'):
+        for board in self.iter_boards():
             self.dest_db.execute('INSERT INTO raw_boards (timestamp, board, source) VALUES (?, ?, ?)',
-                                 (board_timestamp(row['data']), row['data'], self.source_name))
-            st['done'] += 1
+                                 (board_timestamp(board), board, self.source_name))
+            st['done'] = self.get_board_status(st['done'])
 
         st['stage'] = 'finishing'
         st.flush()
         self.dest_db.commit()
         st.finish()
+        
+class ImportMoustacheMiner(Import):
+    def __init__(self, input_file, db_conn, source_name):
+        super(ImportMoustacheMiner, self).__init__(input_file, db_conn, source_name)
+        self.source_csv = csv.DictReader(self.input_file, fieldnames=('id', 'x', 'y', 'user', 'color', 'timestamp'))
 
+    @property
+    def total_items(self):
+        return os.path.getsize(self.input_file.name)
+
+    def iter_placements(self):
+        for row in self.source_csv:
+            yield (float(row['timestamp']) / 1000, int(row['x']), int(row['y']), int(row['color']), row['user'])
+
+    def get_placement_status(self, old_count):
+        return self.input_file.tell()
+        
+    def iter_boards(self):
+        return []
+
+    def get_board_status(self, old_count):
+        return old_count
+        
+class ImportPlaceScraper(Import):
+    def __init__(self, input_file, db_conn, source_name):
+        super(ImportPlaceScraper, self).__init__(input_file, db_conn, source_name)
+        self.source_db = sqlite3.connect(self.input_file.name)
+        self.source_db.row_factory = sqlite3.Row
+
+    @property
+    def total_items(self):
+        placement_cursor = self.source_db.execute('SELECT COUNT(*) FROM placements')
+        bitmap_cursor = self.source_db.execute('SELECT COUNT(*) FROM starting_bitmaps')
+        return placement_cursor.fetchone()[0] + bitmap_cursor.fetchone()[0]
+
+    def iter_placements(self):
+        for row in self.source_db.execute('SELECT * FROM placements'):
+            # NOTE: x and y are swapped in the source database!
+            yield (row['recieved_on'], row['y'], row['x'], row['color'], row['author'])
+
+    def get_placement_status(self, old_count):
+        return old_count + 1
+        
+    def iter_boards(self):
+        for row in self.source_db.execute('SELECT * FROM starting_bitmaps'):
+            yield row['data']
+
+    def get_board_status(self, old_count):
+        return old_count + 1
+
+    
 SCHEMAS = {
+    'moustacheminer': ImportMoustacheMiner,
     'place-scraper': ImportPlaceScraper,
 }
 
