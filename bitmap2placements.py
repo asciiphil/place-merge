@@ -28,7 +28,7 @@ CREATE TABLE placements (
 dest_cur.execute('CREATE INDEX place_timestamp_idx ON placements(timestamp)')
 dest_cur.execute('CREATE INDEX place_position_idx ON placements(x, y)')
 
-filenames = glob.glob(os.path.join('bitmaps', '*'))
+filenames = sorted(glob.glob(os.path.join('bitmaps', '*')))
 
 st = ttystatus.TerminalStatus(period=0.1)
 st.format('%ElapsedTime() %PercentDone(done,total) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)')
