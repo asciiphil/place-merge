@@ -190,6 +190,7 @@ class SourceLepon(Source):
     def query_bitmap_count(self):
         return '''SELECT 0'''
 
+# teaearlgraycold used place-scraper, but fixed the x/y coordinates.
 class SourceTea(SourcePlaceScraper):
     @property
     def name(self):
@@ -198,6 +199,25 @@ class SourceTea(SourcePlaceScraper):
     @property
     def source_file(self):
         return 'source-teaearlgreycold.sqlite'
+    @property
+    def query_pixel(self):
+        return '''SELECT NULL, recieved_on, x, y, color, author FROM placements WHERE x = ? AND y = ? ORDER BY recieved_on'''
+
+    @property
+    def query_pixel_count(self):
+        return '''SELECT COUNT(*) FROM placements WHERE x = ? AND y = ?'''
+
+    @property
+    def query_all(self):
+        return '''SELECT NULL, recieved_on, x, y, color, author FROM placements ORDER BY recieved_on, x, y'''
+
+    @property
+    def query_all_by_time(self):
+        return '''SELECT NULL, recieved_on, x, y, color, author FROM placements ORDER BY recieved_on, x, y'''
+
+    @property
+    def query_all_by_pixel(self):
+        return '''SELECT NULL, recieved_on, x, y, color, author FROM placements ORDER BY x, y, recieved_on'''
 
 class SourceWgoodall(Source):
     @property
