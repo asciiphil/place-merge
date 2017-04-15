@@ -161,8 +161,7 @@ if args.name is None:
     args.name = args.schema
     
 dest_conn = sqlite3.connect(args.output)
-dest_cur = dest_conn.cursor()
-dest_cur.execute("""
+dest_conn.execute("""
 CREATE TABLE IF NOT EXISTS raw_placements (
   timestamp REAL,
   x INTEGER,
@@ -171,12 +170,21 @@ CREATE TABLE IF NOT EXISTS raw_placements (
   author TEXT,
   source TEXT
 )""")
-dest_cur.execute("""
+dest_conn.execute("""
+CREATE INDEX IF NOT EXISTS raw_placements_timestamp_idx
+  ON raw_placements(timestamp)""")
+dest_conn.execute("""
+CREATE INDEX IF NOT EXISTS raw_placements_position_idx
+  ON raw_placements(x, y)""")
+dest_conn.execute("""
 CREATE TABLE IF NOT EXISTS raw_boards (
   timestamp REAL,
   board BLOB,
   source TEXT
 )""")
+dest_conn.execute("""
+CREATE INDEX IF NOT EXISTS raw_boards_timestamp_idx
+  ON raw_boards(timestamp)""")
 dest_conn.commit()
 
 importer = SCHEMAS[args.schema](args.input, dest_conn, args.name)
