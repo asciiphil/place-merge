@@ -1,46 +1,89 @@
 #!/usr/bin/env python
 
+import argparse
+import sqlite3
 import sys
 import time
 
 import ttystatus
 
-from source import *
+from common import *
 
 # If similar placements are closer in time than this number of seconds, consider
 # them to be duplicates.  /r/place always gave at least a 5 minute cooldown,
 # so we'll use that as our window.
 DUPLICATE_WINDOW = 300
 
+parser = argparse.ArgumentParser()
+parser.add_argument('-w', '--working-database', default='working.sqlite', help='Intermediate SQLite database to use.  Default: %(default)s.')
+parser.add_argument('-p', '--pixel', nargs=2, metavar=('X', 'Y'), type=int, help='Instead of merging data, print the merged timeline for the given pixel.')
+args = parser.parse_args()
+source_db = sqlite3.connect(args.working_database)
+source_db.row_factory = sqlite3.Row
 
-if len(sys.argv) > 1:
-    debug = True
-    param_x = int(sys.argv[1])
-    param_y = int(sys.argv[2])
-else:
-    debug = False
-
-def write_pixel(timestamp, x, y, color, author, source, dest_cur, debug):
-    if debug:
-        print '{}  {:3} {:3} {:3}  {:16} {}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(timestamp)), x, y, color, '' if author is None else author, source)
+def new_pixel(canvas, row, dest_cur, st):
+    x = row['x']
+    y = row['y']
+    # This pixel is a duplicate if:
+    #  * It's the same color as the current pixel,
+    #  * It's the same author as the current pixel, AND
+    #  * It's within the window of duplication.
+    if canvas[y, x]['color'] == row['color'] and \
+       canvas[y, x]['author'] == row['author'] and \
+       row['timestamp'] - canvas[y, x]['timestamp'] < DUPLICATE_WINDOW:
+        duplicate_pixel(row['timestamp'], x, y, row['color'], row['author'], row['source'], dest_cur, st)
     else:
-        dest_cur.execute('INSERT INTO placements VALUES (?, ?, ?, ?, ?)', (timestamp, x, y, color, author))
+        update_pixel(row['timestamp'], x, y, row['color'], row['author'], row['source'], dest_cur, st)
+    update_canvas(canvas, x, y, row['color'], row['timestamp'], row['author'])
 
-def write_duplicate(timestamp, x, y, color, author, source, dest_cur, debug):
-    if debug:
-        print '           {}                              + {}'.format(time.strftime('%H:%M:%S', time.gmtime(timestamp)), source)
-        
-source_conn = sqlite3.connect('unpacked.sqlite')
-source_cur = source_conn.cursor()
-if debug:
-    dest_cur = None
+def new_board(canvas, row, dest_cur, st):
+    bitmap = board_bitmap(row['board'])
+    if args.pixel is None:
+        for y, x in np.array(np.where(canvas['color'] != bitmap)).T:
+            update_pixel(row['timestamp'], x, y, bitmap[y, x], None, row['source'], dest_cur, st)
+    else:
+        x, y = args.pixel
+        if canvas[y, x]['color'] != bitmap[y, x]:
+            update_pixel(row['timestamp'], x, y, bitmap[y, x], None, row['source'], dest_cur, st)
+    np.copyto(canvas, bitmap)
+    
+def update_pixel(timestamp, x, y, color, author, source, dest_cur, st):
+    if args.pixel is None:
+        if author is None:
+            # Have to cast color to an int because sqlite3 doesn't understand numpy.uint8.
+            dest_cur.execute('INSERT INTO placements (timestamp, x, y, color) VALUES (?, ?, ?, ?)', (timestamp, x, y, int(color)))
+        else:
+            dest_cur.execute('INSERT INTO placements (timestamp, x, y, color, author) VALUES (?, ?, ?, ?, ?)', (timestamp, x, y, color, author))
+    else:
+        st.notify('{}  {:3} {:3} {:3}  {:16} {}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(timestamp)), x, y, color, '' if author is None else author, source))
+
+def duplicate_pixel(timestamp, x, y, color, author, source, dest_cur, st):
+    if args.pixel is not None:
+        st.notify('           {}                              + {}'.format(time.strftime('%H:%M:%S', time.gmtime(timestamp)), source))
+
+def update_canvas(canvas, x, y, color, timestamp, author):
+    canvas['color'][y, x]     = color
+    canvas['timestamp'][y, x] = timestamp
+    canvas['author'][y, x]    = author
+
+st = ttystatus.TerminalStatus(period=0.1)
+st.format('%ElapsedTime() %PercentDone(done,total) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)')
+st['done'] = 0
+board_count = source_db.execute('SELECT COUNT(*) FROM raw_boards').fetchone()[0]
+if args.pixel is None:
+    placement_count = source_db.execute('SELECT COUNT(*) FROM raw_placements').fetchone()[0]
 else:
-    dest_conn = sqlite3.connect('merged.sqlite')
-    dest_cur = dest_conn.cursor()
+    placement_count = source_db.execute('SELECT COUNT(*) FROM raw_placements WHERE x = ? and y = ?', args.pixel).fetchone()[0]
+st['total'] = placement_count + board_count
+st.flush()
+
+if args.pixel is None:
+    dest_db = sqlite3.connect('merged.sqlite')
+    dest_cur = dest_db.cursor()
     dest_cur.execute('DROP TABLE IF EXISTS placements')
     dest_cur.execute("""
 CREATE TABLE placements (
-  timestamp INTEGER,
+  timestamp REAL,
   x INTEGER,
   y INTEGER,
   color INTEGER,
@@ -50,54 +93,28 @@ CREATE TABLE placements (
     dest_cur.execute('CREATE INDEX placements_color_idx ON placements(color)')
     dest_cur.execute('CREATE INDEX placements_author_idx ON placements(author)')
     dest_cur.execute('CREATE INDEX placements_position_idx ON placements(x, y)')
-
-    st = ttystatus.TerminalStatus(period=0.1)
-    st.format('%ElapsedTime() %PercentDone(done,total) (%Integer(x),%Integer(y)) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)')
-    st['done'] = 0
-    source_cur.execute('SELECT COUNT(*) FROM unpacked')
-    st['total'] = source_cur.fetchone()[0]
-    st.flush()
-
-if debug:
-    source_cur.execute('SELECT timestamp, x, y, color, author, source FROM unpacked WHERE x = ? AND y = ? ORDER BY timestamp', (param_x, param_y))
 else:
-    source_cur.execute('SELECT timestamp, x, y, color, author, source FROM unpacked ORDER BY x, y, timestamp')
-
-last_x = None
-last_y = None
-for timestamp, x, y, color, author, source in source_cur:
-    if not debug:
-        st['x'] = x
-        st['y'] = y
-    if x != last_x or y != last_y:
-        last_color = 0
-        last_source = None
-        last_author = None
-        last_timestamp = 0
-    # If there's no author, this is a synthetic event; only write it if it
-    # changes the color of the pixel.
-    # If there is an author, check for duplication.  It's a duplicate if it has
-    # a different source than the last placement and is within the
-    # DUPLICATE_WINDOW.
-    if (author is None and color != last_color) or \
-       (author is not None and (author != last_author or source == last_source or timestamp - last_timestamp >= DUPLICATE_WINDOW)):
-        write_pixel(timestamp, x, y, color, author, source, dest_cur, debug)
-        # Only update last_timestamp if this was a real placement, and then only
-        # if it was written to the database.  This ensures that we only compare
-        # to the earliest known time of the placement.
-        if author is not None:
-            last_timestamp = timestamp
-    elif author is not None:
-        # This is a real placement, so it must have been a duplicate
-        write_duplicate(timestamp, x, y, color, author, source, dest_cur, debug)
-    last_x = x
-    last_y = y
-    last_color = color
-    last_source = source
-    last_author = author
-    if not debug:
-        st['done'] += 1
+    dest_cur = None
     
-if not debug:
-    dest_conn.commit()
-    st.finish()
+if args.pixel is None:
+    placement_cur = source_db.execute('SELECT * FROM raw_placements ORDER BY timestamp, x, y, source')
+else:
+    placement_cur = source_db.execute('SELECT * FROM raw_placements WHERE x = ? AND y = ? ORDER BY timestamp, source', args.pixel)
+board_cur = source_db.execute('SELECT * FROM raw_boards ORDER BY timestamp, source')
+
+canvas = np.empty((1000, 1000), dtype=[('color', 'u1'), ('timestamp', 'f4'), ('author', 'O')])
+canvas['color'] = 0
+canvas['timestamp'] = 1490979600
+canvas['author'] = ''
+placement_row = placement_cur.fetchone()
+board_row = board_cur.fetchone()
+while placement_row is not None or board_row is not None:
+    if placement_row is not None and (board_row is None or placement_row['timestamp'] < board_row['timestamp']):
+        new_pixel(canvas, placement_row, dest_cur, st)
+        placement_row = placement_cur.fetchone()
+    else:
+        new_board(canvas, board_row, dest_cur, st)
+        board_row = board_cur.fetchone()
+    st['done'] += 1
+if args.pixel is None:
+    dest_db.commit()
