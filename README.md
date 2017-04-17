@@ -19,39 +19,31 @@ wgoodall01.
 
   [teaearlgray]: https://www.reddit.com/r/PlaceDevs/comments/634nzu/_/dfyq6m8/?context=3
 
-For wgoodall01's, F's, teaearlgraycold's and ELFAHBET_SOOP's SQLite
-databases, name them:
+Import each dataset with the `import-source.py` script.  Use its `-s` and
+`-n` parameters.  (See `import-source.py --help` for their descriptions.)
+Use the following schemas:
 
- * `source-ELFAHBET_SOOP.sqlite`
- * `source-F.sqlite`
- * `source-teaearlgraycold.sqlite` and
- * `source-wgoodall01.sqlite`
-
-Name lepon01's file:
-
- * `source-lepon01.csv`
-
-Run `convert-lepon01-csv2sqlite.py` .  This converts lepon01's CSV file
-into an SQLite database that's easier to work with.
-
-Run `add-indexes.sh` .  This adds some indexes that make things work a
-little better.
-
-Run `unpack.py` .  This combines data from all of the source datasets into
-a single, non-consolidated SQLite database.  It also takes the cached
-bitmaps from the board-place API endpoint and creates synthetic pixel
-placements from them, so the merge process will have uniform data to work
-with.  This takes about an hour on the author's system.
+| Dataset         | Schema                |
+|-----------------|-----------------------|
+| ELFAHBET_SOOP   | place-scraper-swapped |
+| F               | place-scraper-swapped |
+| teaearlgraycold | place-scraper         |
+| wgoodall01      | wgoodall01            |
+| lepon01         | moustacheminer        |
 
 At this point, you can run `merge.py` with x and y command line parameters
 to show the merged series of changes for that pixel.  e.g.:
 
-    $ ./merge.py 67 32
-    2017-04-01 08:23:32   67  32  15  calltheherd      ELFAHBET_SOOP
+    $ ./merge.py -p 67 32
+    2017-04-01 08:23:29   67  32  15  calltheherd      teaearlgraycold
+               08:23:31                              + lepon01
+               08:23:32                              + ELFAHBET_SOOP
                08:23:32                              + F
-               08:23:32                              + lepon01
+    2017-04-02 04:25:10   67  32   3                   wgoodall01
     2017-04-02 05:39:36   67  32   3  DeepFriedBabeez  F
     2017-04-02 06:32:23   67  32   3  DeepFriedBabeez  ELFAHBET_SOOP
+    2017-04-02 07:42:11   67  32   3  DeepFriedBabeez  teaearlgraycold
+    00h01m18s 100 % [##############################################] ETA: 00h00m00s
 
 This is useful for debugging and sanity-checking.
 
