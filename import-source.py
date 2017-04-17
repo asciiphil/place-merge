@@ -33,8 +33,9 @@ class Import(object):
         st['stage'] = 'placements'
         st.flush()
         for timestamp, x, y, color, author in self.iter_placements():
-            self.dest_db.execute('INSERT INTO raw_placements (timestamp, x, y, color, author, source) VALUES (?, ?, ?, ?, ?, ?)',
-                                 (timestamp, x, y, color, author, self.source_name))
+            if x < 1000 and y < 1000:
+                self.dest_db.execute('INSERT INTO raw_placements (timestamp, x, y, color, author, source) VALUES (?, ?, ?, ?, ?, ?)',
+                                     (timestamp, x, y, color, author, self.source_name))
             st['done'] = self.get_placement_status(st['done'])
 
         # Transfer bitmaps
