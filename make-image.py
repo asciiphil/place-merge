@@ -1,56 +1,44 @@
 #!/usr/bin/env python
 
+import argparse
+import sqlite3
+
 import numpy as np
 import ttystatus
 from PIL import Image
 
-from source import *
+from common import *
 
-STD_COLORS = np.array([
-    (255, 255, 255),
-    (228, 228, 228),
-    (136, 136, 136),
-    (34, 34, 34),
-    (255, 167, 209),
-    (229, 0, 0),
-    (229, 149, 0),
-    (160, 106, 66),
-    (229, 217, 0),
-    (148, 224, 68),
-    (2, 190, 1),
-    (0, 211, 221),
-    (0, 131, 199),
-    (0, 0, 234),
-    (207, 110, 228),
-    (130, 0, 128),
-], np.uint8)
+parser = argparse.ArgumentParser()
+parser.add_argument('-w', '--working-database', default='working.sqlite', help='Intermediate SQLite database to use.  Default: %(default)s.')
+args = parser.parse_args()
+db = sqlite3.connect(args.working_database)
+db.row_factory = sqlite3.Row
 
-for source in [SourceELFAHBET(), SourceF(), SourceLepon(), SourceTea(), SourceWgoodall()]:
-#for source in [SourceMerged()]:
-    canvas = np.zeros((1001, 1001), np.uint8)
-    source.all_by_time()
-    source.all_bitmaps()
+st = ttystatus.TerminalStatus(period=0.1)
+st.format('%ElapsedTime() %PercentDone(done,total) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)')
+st['done'] = 0
+placement_count = db.execute('SELECT COUNT(*) FROM raw_placements').fetchone()[0]
+board_count = db.execute('SELECT COUNT(*) FROM raw_boards').fetchone()[0]
+st['total'] = placement_count + board_count
 
-    st = ttystatus.TerminalStatus(period=0.1)
-    st.format('%ElapsedTime() {} %PercentDone(done,total) (%Integer(x),%Integer(y)) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)'.format(source.name))
-    st['done'] = 0
-    st['total'] = source.count
+canvases = {}
+placement_cursor = db.execute('SELECT * FROM raw_placements ORDER BY timestamp, x, y, source')
+board_cursor = db.execute('SELECT * FROM raw_boards ORDER BY timestamp, source')
+placement_row = placement_cursor.fetchone()
+board_row = board_cursor.fetchone()
+while placement_row is not None or board_row is not None:
+    if board_row is None or placement_row['timestamp'] < board_row['timestamp']:
+        source_name = placement_row['source']
+        if source_name not in canvases:
+            canvases[source_name] = np.zeros((1000, 1000), np.uint8)
+        canvases[source_name][placement_row['y'], placement_row['x']] = placement_row['color']
+        placement_row = placement_cursor.fetchone()
+    else:
+        source_name = board_row['source']
+        canvases[source_name] = board_bitmap(board_row['board'])
+        board_row = board_cursor.fetchone()
+    st['done'] += 1
 
-    while not source.is_done:
-        st['x'] = source.x
-        st['y'] = source.y
-        while not source.bitmap_done and source.bitmap_timestamp < source.timestamp:
-            canvas = source.bitmap
-            source.next_bitmap()
-        if source.x < 1000 and source.y < 1000:
-            canvas[source.y, source.x] = source.color
-        source.next()
-        st['done'] += 1
-    st.finish()
-
-    if not source.bitmap_done:
-        print 'Final {} image from stored bitmap.'.format(source.name)
-        while not source.bitmap_done:
-            canvas = source.bitmap
-            source.next_bitmap()
-    Image.fromarray(STD_COLORS[canvas]).save('Source{}.png'.format(source.name))
+for source_name, canvas in canvases.iteritems():
+    Image.fromarray(STD_COLORS[canvas]).save('image-{}.png'.format(source_name))
