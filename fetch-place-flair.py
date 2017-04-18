@@ -46,7 +46,7 @@ last_added = 0
 reddit = praw.Reddit(user_agent=USER_AGENT)
 subreddit = reddit.subreddit('place')
 for submission in subreddit.top(limit=TOP_SUBMISSION_COUNT):
-    print '{}: {}...'.format(submission.id, submission.title)
+    print u'{}: {}...'.format(submission.id, submission.title)
     submission.comments.replace_more(limit=MORE_COMMENTS_COUNT)
     comment_queue = submission.comments[:]
     while comment_queue:
