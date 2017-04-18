@@ -9,12 +9,8 @@ import time
 
 import praw
 
-USER_AGENT = '/r/place flair scraper (by /u/phil_g)'
-TOP_SUBMISSION_COUNT = 1000  # How many submissions to fetch.
-# How many times per submission to fetch "More comments...".  Higher numbers
-# will be more thorough, but will take much longer, since each one is a
-# separate Reddit API call, and API users are limited to 60 calls per minute.
-MORE_COMMENTS_COUNT = 60
+VERSION = '0.1'
+USER_AGENT = '/r/place flair scraper v{} (by /u/phil_g)'.format(VERSION)
 
 # Assume stdout can always handle UTF-8/
 UTF8Writer = codecs.getwriter('utf8')
@@ -22,8 +18,11 @@ sys.stdout = UTF8Writer(sys.stdout)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-w', '--working-database', default='working.sqlite', help='Intermediate SQLite database to use.  Default: %(default)s.')
+parser.add_argument('-s', '--submission-limit', type=int, default=100, help='How many of the top submissions to retrieve.  Default %(default)s, max 1000.', metavar='LIMIT')
+parser.add_argument('-c', '--more-comment-limit', type=int, default=0, help='How many times per submission to retrieve "More comments..." blocks.  Higher values will be more thorough, but will take longer, since each one uses a Reddit API request and clients are limited to 60 requests per minute.  Default %(default)s.', metavar='LIMIT')
 args = parser.parse_args()
 db = sqlite3.connect(args.working_database)
+db.row_factory = sqlite3.Row
 
 db.execute("""
 CREATE TABLE IF NOT EXISTS known_placements (
@@ -40,14 +39,22 @@ def add_placement(timestamp, x, y, color, user, cursor):
     if cursor.fetchone()[0] == 0:
         cursor.execute('INSERT INTO known_placements (timestamp, x, y, color, author) VALUES (?, ?, ?, ?, ?)', (timestamp, x, y, color, user))
 
+
 cursor = db.cursor()
+
+print 'Loading previous known placements...',
 flair = {}
-last_added = 0
+for row in db.execute('SELECT * FROM known_placements'):
+    flair[row['author']] = (row['timestamp'], row['x'], row['y'], row['color'])
+last_added = len(flair)
+print 'done.'
 reddit = praw.Reddit(user_agent=USER_AGENT)
 subreddit = reddit.subreddit('place')
-for submission in subreddit.top(limit=TOP_SUBMISSION_COUNT):
+for submission in subreddit.top(limit=args.submission_limit):
     print u'{}: {}...'.format(submission.id, submission.title)
-    submission.comments.replace_more(limit=MORE_COMMENTS_COUNT)
+    not_replaced = submission.comments.replace_more(limit=args.more_comment_limit)
+    if len(not_replaced) > 0:
+        print 'Skipped {} "More comments..." blocks'.format(len(not_replaced))
     comment_queue = submission.comments[:]
     while comment_queue:
         comment = comment_queue.pop(0)
