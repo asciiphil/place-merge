@@ -100,10 +100,12 @@ st.format('%ElapsedTime() %PercentDone(done,total) [%ProgressBar(done,total)] ET
 st['done'] = 0
 board_count = source_db.execute('SELECT COUNT(*) FROM raw_boards').fetchone()[0]
 if args.pixel is None:
-    placement_count = source_db.execute('SELECT COUNT(*) FROM raw_placements').fetchone()[0]
+    raw_placement_count = source_db.execute('SELECT COUNT(*) FROM raw_placements').fetchone()[0]
+    known_placement_count = source_db.execute('SELECT COUNT(*) FROM known_placements').fetchone()[0]
 else:
-    placement_count = source_db.execute('SELECT COUNT(*) FROM raw_placements WHERE x = ? and y = ?', args.pixel).fetchone()[0]
-st['total'] = placement_count + board_count
+    raw_placement_count = source_db.execute('SELECT COUNT(*) FROM raw_placements WHERE x = ? and y = ?', args.pixel).fetchone()[0]
+    known_placement_count = source_db.execute('SELECT COUNT(*) FROM known_placements WHERE x = ? and y = ?', args.pixel).fetchone()[0]
+st['total'] = raw_placement_count + known_placement_count + board_count
 st.flush()
 
 if args.pixel is None:
@@ -124,11 +126,27 @@ CREATE TABLE placements (
     dest_cur.execute('CREATE INDEX placements_position_idx ON placements(x, y)')
 else:
     dest_cur = None
-    
+
+ALL_PLACEMENT_QUERY = """
+SELECT offset_timestamp(timestamp, source) AS timestamp, x, y, color, author, source
+  FROM raw_placements
+UNION
+SELECT timestamp, x, y, color, author, '_known' AS source
+  FROM known_placements
+  ORDER BY timestamp, x, y, source"""
+PIXEL_PLACEMENT_QUERY = """
+SELECT offset_timestamp(timestamp, source) AS timestamp, x, y, color, author, source
+  FROM raw_placements
+  WHERE x = :x AND y = :y
+UNION
+SELECT timestamp, x, y, color, author, '_known' AS source
+  FROM known_placements
+  WHERE x = :x AND y = :y
+  ORDER BY timestamp, x, y, source"""
 if args.pixel is None:
-    placement_cur = source_db.execute('SELECT offset_timestamp(timestamp, source) AS timestamp, x, y, color, author, source FROM raw_placements ORDER BY offset_timestamp(timestamp, source), x, y, source')
+    placement_cur = source_db.execute(ALL_PLACEMENT_QUERY)
 else:
-    placement_cur = source_db.execute('SELECT offset_timestamp(timestamp, source) AS timestamp, x, y, color, author, source FROM raw_placements WHERE x = ? AND y = ? ORDER BY offset_timestamp(timestamp, source), source', args.pixel)
+    placement_cur = source_db.execute(PIXEL_PLACEMENT_QUERY, {'x':args.pixel[0], 'y':args.pixel[1]})
 board_cur = source_db.execute('SELECT * FROM raw_boards ORDER BY timestamp, source')
 
 canvas = np.empty((1000, 1000), dtype=[('color', 'u1'), ('timestamp', 'f4'), ('author', 'O')])
