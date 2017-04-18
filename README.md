@@ -70,7 +70,7 @@ Check its `--help` parameter; you can use its command line parameters to
 pull more or less data, depending on how long you want it to run.
 
 After you've imported or fetched some flair, run `correlate-timestamps.py`
-to figure out adjustments to the dataset's timestamps.
+to figure out adjustments to the datasets' timestamps.
 
 At this point, you can run `merge.py` with x and y command line parameters
 to show the merged series of changes for that pixel.  e.g.:
