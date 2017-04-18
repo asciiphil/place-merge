@@ -46,5 +46,6 @@ for input_file in args.input:
         timestamp = float(match.group(3))
         #
         user = span.previous_sibling.text
-        add_placement(timestamp, x, y, color, user)
+        if x < 1000 and y < 1000:
+            add_placement(timestamp, x, y, color, user)
     known_conn.commit()

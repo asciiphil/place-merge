@@ -59,8 +59,9 @@ for submission in subreddit.top(limit=TOP_SUBMISSION_COUNT):
                 y = int(match.group(2))
                 timestamp = float(match.group(3))
                 flair[comment.author.name] = (timestamp, x, y, color)
-                print '{} ({},{}) {} {}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(timestamp)), x, y, color, comment.author.name)
-                add_placement(timestamp, x, y, color, comment.author.name, cursor)
+                if x < 1000 and y < 1000:
+                    print '{} ({},{}) {} {}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(timestamp)), x, y, color, comment.author.name)
+                    add_placement(timestamp, x, y, color, comment.author.name, cursor)
     print '...done ({} {}/{})'.format(submission.id, len(flair) - last_added, len(flair))
     last_added = len(flair)
     db.commit()
