@@ -21,20 +21,39 @@ args = parser.parse_args()
 source_db = sqlite3.connect(args.working_database)
 source_db.row_factory = sqlite3.Row
 
-def new_pixel(canvas, row, dest_cur, st):
+def offset_timestamp(timestamp, source):
+    before_row = source_db.execute('SELECT timestamp, offset FROM offsets WHERE source = ? and timestamp <= ? ORDER BY timestamp DESC LIMIT 1', (source, timestamp)).fetchone()
+    after_row = source_db.execute('SELECT timestamp, offset FROM offsets WHERE source = ? and timestamp >= ? ORDER BY timestamp LIMIT 1', (source, timestamp)).fetchone()
+    if before_row is None:
+        return timestamp + after_row['offset']
+    elif after_row is None:
+        return timestamp + before_row['offset']
+    elif before_row['timestamp'] == after_row['timestamp']: 
+        return timestamp + after_row['offset']
+    else:
+        ts_0, o_0 = (before_row['timestamp'], before_row['offset'])
+        ts_1, o_1 = (after_row['timestamp'], after_row['offset'])
+        slope = (o_1 - o_0) / (ts_1 - ts_0)
+        intercept = o_0 - slope * ts_0
+        return timestamp + (slope * timestamp + intercept)
+
+source_db.create_function('offset_timestamp', 2, offset_timestamp)
+
+def new_pixel(canvas, row, offsets, dest_cur, st):
     x = row['x']
     y = row['y']
+    timestamp = row['timestamp']
     # This pixel is a duplicate if:
     #  * It's the same color as the current pixel,
     #  * It's the same author as the current pixel, AND
     #  * It's within the window of duplication.
     if canvas[y, x]['color'] == row['color'] and \
        canvas[y, x]['author'] == row['author'] and \
-       row['timestamp'] - canvas[y, x]['timestamp'] < DUPLICATE_WINDOW:
-        duplicate_pixel(row['timestamp'], x, y, row['color'], row['author'], row['source'], dest_cur, st)
+       timestamp - canvas[y, x]['timestamp'] < DUPLICATE_WINDOW:
+        duplicate_pixel(timestamp, x, y, row['color'], row['author'], row['source'], dest_cur, st)
     else:
-        update_pixel(row['timestamp'], x, y, row['color'], row['author'], row['source'], dest_cur, st)
-    update_canvas(canvas, x, y, row['color'], row['timestamp'], row['author'])
+        update_pixel(timestamp, x, y, row['color'], row['author'], row['source'], dest_cur, st)
+    update_canvas(canvas, x, y, row['color'], timestamp, row['author'])
 
 def new_board(canvas, row, dest_cur, st):
     bitmap = board_bitmap(row['board'])
@@ -65,6 +84,16 @@ def update_canvas(canvas, x, y, color, timestamp, author):
     canvas['color'][y, x]     = color
     canvas['timestamp'][y, x] = timestamp
     canvas['author'][y, x]    = author
+
+print 'loading offsets...',
+offsets = {}
+for row in source_db.execute('SELECT * FROM offsets'):
+    if row['source'] not in offsets:
+        offsets[row['source']] = []
+    offsets[row['source']].append((row['timestamp'], row['offset']))
+for key in offsets.keys():
+    offsets[key].sort()
+print 'done.'
 
 st = ttystatus.TerminalStatus(period=0.1)
 st.format('%ElapsedTime() %PercentDone(done,total) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)')
@@ -97,9 +126,9 @@ else:
     dest_cur = None
     
 if args.pixel is None:
-    placement_cur = source_db.execute('SELECT * FROM raw_placements ORDER BY timestamp, x, y, source')
+    placement_cur = source_db.execute('SELECT offset_timestamp(timestamp, source) AS timestamp, x, y, color, author, source FROM raw_placements ORDER BY offset_timestamp(timestamp, source), x, y, source')
 else:
-    placement_cur = source_db.execute('SELECT * FROM raw_placements WHERE x = ? AND y = ? ORDER BY timestamp, source', args.pixel)
+    placement_cur = source_db.execute('SELECT offset_timestamp(timestamp, source) AS timestamp, x, y, color, author, source FROM raw_placements WHERE x = ? AND y = ? ORDER BY offset_timestamp(timestamp, source), source', args.pixel)
 board_cur = source_db.execute('SELECT * FROM raw_boards ORDER BY timestamp, source')
 
 canvas = np.empty((1000, 1000), dtype=[('color', 'u1'), ('timestamp', 'f4'), ('author', 'O')])
@@ -110,7 +139,7 @@ placement_row = placement_cur.fetchone()
 board_row = board_cur.fetchone()
 while placement_row is not None or board_row is not None:
     if placement_row is not None and (board_row is None or placement_row['timestamp'] < board_row['timestamp']):
-        new_pixel(canvas, placement_row, dest_cur, st)
+        new_pixel(canvas, placement_row, offsets, dest_cur, st)
         placement_row = placement_cur.fetchone()
     else:
         new_board(canvas, board_row, dest_cur, st)
