@@ -7,6 +7,10 @@ import ttystatus
 
 from common import *
 
+# Largest offset we'll tolerate.  If we get a value bigger than this, we'll
+# assume it's an error and ignore it.
+MAX_DIFFERENCE = 1000
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-w', '--working-database', default='working.sqlite', help='Intermediate SQLite database to use.  Default: %(default)s.')
 args = parser.parse_args()
@@ -28,13 +32,31 @@ placement_count = db.execute('SELECT COUNT(*) FROM known_placements').fetchone()
 st['total'] = placement_count
 st.flush()
 
+last_timestamps = {}
 for known_row in db.execute('SELECT * FROM known_placements'):
-    for raw_row in db.execute('SELECT COUNT(*), source FROM raw_placements WHERE x = ? AND y = ? AND color = ? AND author = ? GROUP BY source',
+    use_placement = True
+    timestamps = {}
+    for raw_row in db.execute('SELECT * FROM raw_placements WHERE x = ? AND y = ? AND color = ? AND author = ?',
                               (known_row['x'], known_row['y'], known_row['color'], known_row['author'])):
-        if raw_row[0] == 1:
-            row = db.execute('SELECT * FROM raw_placements WHERE x = ? AND y = ? AND color = ? AND author = ? GROUP BY source',
-                             (known_row['x'], known_row['y'], known_row['color'], known_row['author'])).fetchone()
-            db.execute('INSERT OR REPLACE INTO offsets (source, timestamp, offset) VALUES (?, ?, ?)', (row['source'], row['timestamp'], known_row['timestamp'] - row['timestamp']))
+        source = raw_row['source']
+        if source in timestamps:
+            # Multiple entries for this placement.  Don't use it.
+            use_placement = False
+        elif source in last_timestamps and raw_row['timestamp'] < last_timestamps[source]:
+            # Offset adjustment would put this placement earlier than the
+            # previous placement.  We assume that this shouldn't happen (i.e.
+            # placements are never logged out of order), so it means that
+            # there are unlogged duplicates for this placement.  Don't use it.
+            use_placement = False
+        elif abs(known_row['timestamp'] - raw_row['timestamp']) > MAX_DIFFERENCE:
+            use_placement = False
+        else:
+            # Looks good so far.
+            timestamps[source] = raw_row['timestamp']
+    if use_placement:
+        for source, raw_timestamp in timestamps.iteritems():
+            db.execute('INSERT OR REPLACE INTO offsets (source, timestamp, offset) VALUES (?, ?, ?)', (source, raw_timestamp, known_row['timestamp'] - raw_timestamp))
+    last_timestamps = timestamps
     st['done'] += 1
 db.commit()
 st.finish()
