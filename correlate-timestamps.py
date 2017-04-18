@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS offsets (
   offset REAL,
   PRIMARY KEY(source, timestamp)
 )""")
+db.execute('DELETE FROM offsets')
 
 st = ttystatus.TerminalStatus(period=0.1)
 st.format('%ElapsedTime() %PercentDone(done,total) [%ProgressBar(done,total)] ETA: %RemainingTime(done,total)')
