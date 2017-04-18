@@ -64,7 +64,7 @@ def new_board(canvas, row, dest_cur, st):
         x, y = args.pixel
         if canvas[y, x]['color'] != bitmap[y, x]:
             update_pixel(row['timestamp'], x, y, bitmap[y, x], None, row['source'], dest_cur, st)
-    np.copyto(canvas, bitmap)
+    np.copyto(canvas['color'], bitmap)
     
 def update_pixel(timestamp, x, y, color, author, source, dest_cur, st):
     if args.pixel is None:
